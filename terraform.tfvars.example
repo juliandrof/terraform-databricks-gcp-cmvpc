@@ -1,0 +1,10 @@
+databricks_account_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+gcp_project_id        = "my-gcp-project"
+gcp_region            = "us-central1"
+workspace_name        = "my-databricks-workspace"
+vpc_name              = "databricks-vpc"
+
+# Adjust CIDR ranges as needed for your network topology
+subnet_ip_cidr_range  = "10.0.0.0/20"
+pod_ip_cidr_range     = "10.1.0.0/16"
+service_ip_cidr_range = "10.2.0.0/20"
