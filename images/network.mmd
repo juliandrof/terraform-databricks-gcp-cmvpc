@@ -1,44 +1,59 @@
 flowchart TB
-    classDef vpcStyle fill:#1a73e8,stroke:#0d47a1,color:#ffffff,font-weight:bold
-    classDef subnetStyle fill:#4285f4,stroke:#1a73e8,color:#ffffff,font-weight:bold
-    classDef primaryRange fill:#0f9d58,stroke:#0b7a45,color:#ffffff,font-weight:bold
-    classDef podsRange fill:#e8710a,stroke:#b85c08,color:#ffffff,font-weight:bold
-    classDef servicesRange fill:#a142f4,stroke:#7c2fc2,color:#ffffff,font-weight:bold
-    classDef masterRange fill:#c5221f,stroke:#922019,color:#ffffff,font-weight:bold
-    classDef natStyle fill:#fbbc04,stroke:#e8a000,color:#202124,font-weight:bold
-    classDef firewallStyle fill:#34a853,stroke:#1e7e34,color:#ffffff,font-weight:bold
-    classDef internetStyle fill:#5f6368,stroke:#3c4043,color:#ffffff,font-weight:bold
-    classDef gcpStyle fill:#e8f0fe,stroke:#4285f4,color:#202124
+    classDef primaryRangeStyle fill:#1a73e8,stroke:#0d47a1,color:#ffffff,font-weight:bold
+    classDef sizingStyle fill:#fce4ec,stroke:#c62828,color:#880e4f,font-weight:normal
+    classDef nodeStyle fill:#43a047,stroke:#2e7d32,color:#ffffff,font-weight:bold
+    classDef natStyle fill:#ff9800,stroke:#e65100,color:#ffffff,font-weight:bold
+    classDef fwStyle fill:#e53935,stroke:#b71c1c,color:#ffffff,font-weight:bold
+    classDef advantageStyle fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20,font-weight:bold
+    classDef internetStyle fill:#455a64,stroke:#263238,color:#ffffff,font-weight:bold
 
-    INTERNET["Internet\n(Outbound Traffic)"]:::internetStyle
+    INTERNET(["Internet / Google APIs"]):::internetStyle
 
-    subgraph GCP["Google Cloud Platform"]
+    subgraph VPC["  VPC: databricks-vpc  "]
         direction TB
 
-        NAT["Cloud NAT\nOutbound Internet Gateway\nManaged SNAT"]:::natStyle
+        FW["Firewall Rule
+─────────────────────────
+Allow internal traffic
+Source CIDR: 10.0.0.0/20
+Destination: 10.0.0.0/20
+Protocol: all"]:::fwStyle
 
-        subgraph VPC["VPC: databricks-vpc"]
+        subgraph SUBNET["  Subnet: databricks-vpc-subnet  "]
             direction TB
 
-            FW["Firewall Rule\nAllow Internal Traffic\nSources: 10.0.0.0/20, 10.1.0.0/16,\n10.2.0.0/20, 10.3.0.0/28"]:::firewallStyle
+            PRIMARY["Primary Range: 10.0.0.0/20
+─────────────────────────────────────
+GCE Compute Nodes — Each node uses 2 IPs"]:::primaryRangeStyle
 
-            subgraph SUBNET["Subnet: databricks-vpc-subnet  (Region: us-east1)"]
-                direction TB
+            SIZING["Subnet Sizing Guide
+─────────────────────────────────────
+/25  →  ~60 nodes    (126 IPs)
+/24  →  ~120 nodes   (254 IPs)
+/22  →  ~500 nodes   (1,022 IPs)
+/20  →  ~2,000 nodes (4,094 IPs)"]:::sizingStyle
 
-                PRIMARY["PRIMARY RANGE\ndatabricks-vpc-subnet\n10.0.0.0/20\nGKE Nodes\n4,094 available IPs\n/20 prefix"]:::primaryRange
-
-                PODS["SECONDARY RANGE — pods\n10.1.0.0/16\nGKE Pods\n65,534 available IPs\n/16 prefix"]:::podsRange
-
-                SERVICES["SECONDARY RANGE — services\n10.2.0.0/20\nGKE Services\n4,094 available IPs\n/20 prefix"]:::servicesRange
-
-                MASTER["GKE MASTER RANGE\n10.3.0.0/28\nControl Plane (Private)\n14 available IPs\n/28 prefix"]:::masterRange
-            end
+            NODE1["GCE Node 1
+10.0.0.2 — 10.0.0.3"]:::nodeStyle
+            NODE2["GCE Node 2
+10.0.0.4 — 10.0.0.5"]:::nodeStyle
+            NODE3["GCE Node ...N
+10.0.x.x — 10.0.x.x"]:::nodeStyle
         end
+
+        NAT["Cloud NAT
+─────────────────────────
+Outbound-only egress
+Nodes have NO public IPs
+All outbound via NAT GW"]:::natStyle
+
+        ADVANTAGE["GCE Advantage — No Secondary IP Ranges Required
+Only ONE primary subnet range is needed.
+Simple flat network topology — no pod or service CIDRs."]:::advantageStyle
     end
 
-    PRIMARY -- "Pods scheduled\non nodes" --> PODS
-    PRIMARY -- "Services exposed\nto nodes" --> SERVICES
-    MASTER -- "API server controls\nnode workloads" --> PRIMARY
-    FW -. "Allows intra-VPC\ncommunication" .-> SUBNET
-    PRIMARY -- "Outbound via\nCloud NAT" --> NAT
+    PRIMARY --- SIZING
+    PRIMARY --> NODE1 & NODE2 & NODE3
+    FW -. "Protects node-to-node communication" .-> SUBNET
+    SUBNET --> NAT
     NAT --> INTERNET

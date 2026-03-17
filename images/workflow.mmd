@@ -1,25 +1,25 @@
 flowchart TD
-    S1["<b>STEP 1</b><br/>Install Prerequisites<br/><i>Terraform · gcloud CLI · Databricks CLI</i>"]
-    S2["<b>STEP 2</b><br/>Authenticate<br/><i>GCP Service Account + Databricks Account API</i>"]
-    S3["<b>STEP 3</b><br/>Configure Variables<br/><i>edit terraform.tfvars</i>"]
-    S4["<b>STEP 4</b><br/>terraform init<br/><i>Download providers and modules</i>"]
-    S5["<b>STEP 5</b><br/>terraform plan<br/><i>Review planned changes</i>"]
-    DEC{Plan looks good?}
-    S6["<b>STEP 6</b><br/>terraform apply<br/><i>Deploy infrastructure to GCP</i>"]
-    S7["<b>STEP 7</b><br/>Access Workspace<br/><i>Open workspace URL from outputs</i>"]
+    S1["<b>STEP 1</b><br/>Install Prerequisites<br/><i>Terraform · gcloud CLI</i>"]
+    S2["<b>STEP 2</b><br/>Authenticate<br/><i>GCP + Databricks Account API</i>"]
+    S3["<b>STEP 3</b><br/>Configure Variables<br/><i>terraform.tfvars</i>"]
+    S4["<b>STEP 4 — terraform init</b><br/><i>Download providers &amp; modules</i>"]
+    S5["<b>STEP 5 — terraform plan</b><br/><i>Review proposed changes</i>"]
+    DEC{{"Plan looks good?"}}
+    S6["<b>STEP 6 — terraform apply</b><br/><i>Deploy VPC + GCE workspace</i>"]
+    S7["<b>STEP 7 — Access Workspace</b><br/><i>Workspace URL in outputs</i>"]
 
     S1 --> S2
     S2 --> S3
     S3 --> S4
     S4 --> S5
     S5 --> DEC
-    DEC -->|Yes| S6
-    DEC -->|"No — revise config"| S3
+    DEC -->|"Yes"| S6
+    DEC -->|"No — revise vars"| S3
     S6 --> S7
 
     style S1 fill:#1A73E8,stroke:#1558B0,color:#FFFFFF
     style S2 fill:#1A73E8,stroke:#1558B0,color:#FFFFFF
-    style S3 fill:#1A73E8,stroke:#1558B0,color:#FFFFFF
+    style S3 fill:#5E97F6,stroke:#3367D6,color:#FFFFFF
     style S4 fill:#34A853,stroke:#1E7E34,color:#FFFFFF
     style S5 fill:#34A853,stroke:#1E7E34,color:#FFFFFF
     style DEC fill:#FBBC04,stroke:#F09900,color:#212121

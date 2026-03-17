@@ -27,21 +27,9 @@ variable "vpc_name" {
 }
 
 variable "subnet_ip_cidr_range" {
-  description = "Primary IP CIDR range for the GKE nodes subnet"
+  description = "Primary IP CIDR range for the compute subnet (each GCE node uses 2 IPs)"
   type        = string
   default     = "10.0.0.0/20"
-}
-
-variable "pod_ip_cidr_range" {
-  description = "Secondary IP CIDR range for GKE pods"
-  type        = string
-  default     = "10.1.0.0/16"
-}
-
-variable "service_ip_cidr_range" {
-  description = "Secondary IP CIDR range for GKE services"
-  type        = string
-  default     = "10.2.0.0/20"
 }
 
 variable "private_google_access" {

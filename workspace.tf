@@ -1,6 +1,9 @@
 # -----------------------------------------------------------------------------
 # Register the customer-managed VPC as a Databricks network configuration,
 # then create the workspace that uses it.
+#
+# Databricks on GCP uses GCE (Google Compute Engine) VMs for its compute plane.
+# No GKE configuration or secondary IP ranges are needed.
 # -----------------------------------------------------------------------------
 
 resource "databricks_mws_networks" "this" {
@@ -9,12 +12,10 @@ resource "databricks_mws_networks" "this" {
   network_name = "${var.workspace_name}-network"
 
   gcp_network_info {
-    network_project_id    = var.gcp_project_id
-    vpc_id                = google_compute_network.databricks_vpc.name
-    subnet_id             = google_compute_subnetwork.databricks_subnet.name
-    subnet_region         = var.gcp_region
-    pod_ip_range_name     = "pods"
-    service_ip_range_name = "services"
+    network_project_id = var.gcp_project_id
+    vpc_id             = google_compute_network.databricks_vpc.name
+    subnet_id          = google_compute_subnetwork.databricks_subnet.name
+    subnet_region      = var.gcp_region
   }
 }
 
@@ -31,10 +32,4 @@ resource "databricks_mws_workspaces" "this" {
   }
 
   network_id = databricks_mws_networks.this.network_id
-
-  # GKE config is required for customer-managed VPC workspaces
-  gke_config {
-    connectivity_type = "PRIVATE_NODE_PUBLIC_MASTER"
-    master_ip_range   = "10.3.0.0/28"
-  }
 }

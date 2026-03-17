@@ -5,16 +5,16 @@
 <h1 align="center">Databricks Workspace on GCP<br/>Customer-Managed VPC</h1>
 
 <p align="center">
-  <strong>Terraform configuration to deploy a Databricks workspace on Google Cloud Platform using a customer-managed VPC, giving you full control over network topology, IP ranges, and security boundaries.</strong>
+  <strong>Terraform configuration to deploy a Databricks workspace on Google Cloud Platform using a customer-managed VPC with GCE-based compute, giving you full control over network topology, IP ranges, and security boundaries.</strong>
 </p>
 
 <p align="center">
-  <a href="#-architecture">Architecture</a> •
-  <a href="#-whats-included">What's Included</a> •
-  <a href="#-prerequisites">Prerequisites</a> •
-  <a href="#%EF%B8%8F-step-by-step-deployment">Step-by-Step</a> •
-  <a href="#-variables">Variables</a> •
-  <a href="#-customization">Customization</a>
+  <a href="#architecture">Architecture</a> •
+  <a href="#whats-included">What's Included</a> •
+  <a href="#prerequisites">Prerequisites</a> •
+  <a href="#step-by-step-deployment">Step-by-Step</a> •
+  <a href="#variables">Variables</a> •
+  <a href="#customization">Customization</a>
 </p>
 
 ---
@@ -25,18 +25,20 @@
   <img src="images/architecture.png" alt="Architecture Overview" width="800"/>
 </p>
 
-This deployment creates a **customer-managed VPC** in your GCP project and provisions a Databricks workspace that uses it. The GKE-based compute plane runs entirely within your VPC, giving you full control over networking.
+Databricks on GCP uses **Google Compute Engine (GCE)** VMs for its compute plane. This deployment creates a **customer-managed VPC** in your GCP project and provisions a Databricks workspace that runs all compute nodes as GCE VM instances within your VPC — with **no public IPs**.
+
+> **Note:** Databricks previously used GKE (Google Kubernetes Engine) for its GCP compute plane. As of 2024, all new workspaces use **GCE-based compute**, which offers simpler networking (no secondary IP ranges for pods/services) and faster cluster startup times.
 
 ## What's Included
 
 | Resource | Description |
 |---|---|
 | **VPC** | Custom-mode VPC with no auto-created subnets |
-| **Subnet** | Regional subnet with primary + secondary IP ranges (pods & services) |
-| **Firewall** | Allows all internal traffic between nodes, pods, and services |
-| **Cloud Router + NAT** | Outbound internet access for private GKE nodes |
+| **Subnet** | Regional subnet with a single primary IP range for GCE compute nodes |
+| **Firewall** | Allows all internal traffic between compute nodes |
+| **Cloud Router + NAT** | Outbound internet access for private GCE VMs |
 | **Databricks Network** | MWS network configuration pointing to the customer VPC |
-| **Databricks Workspace** | Workspace deployed with `PRIVATE_NODE_PUBLIC_MASTER` GKE config |
+| **Databricks Workspace** | Workspace provisioned with GCE-based compute in your VPC |
 
 ### Network Layout
 
@@ -44,12 +46,18 @@ This deployment creates a **customer-managed VPC** in your GCP project and provi
   <img src="images/network.png" alt="Network CIDR Diagram" width="700"/>
 </p>
 
-| Range | CIDR | IPs | Purpose |
-|---|---|---|---|
-| Primary (Nodes) | `10.0.0.0/20` | 4,094 | GKE worker nodes |
-| Secondary (Pods) | `10.1.0.0/16` | 65,534 | Kubernetes pods |
-| Secondary (Services) | `10.2.0.0/20` | 4,094 | Kubernetes services |
-| GKE Master | `10.3.0.0/28` | 14 | GKE control plane |
+With GCE-based compute, the networking is straightforward — you only need **one primary subnet range**. Each Databricks compute node uses **2 IP addresses** from the subnet.
+
+| Subnet CIDR | Usable IPs | Max Concurrent Nodes |
+|---|---|---|
+| `/25` | 126 | ~60 |
+| `/24` | 254 | ~120 |
+| `/23` | 510 | ~250 |
+| `/22` | 1,022 | ~500 |
+| `/21` | 2,046 | ~1,000 |
+| `/20` | 4,094 | ~2,000 |
+
+> **Tip:** The default `/20` supports up to ~2,000 concurrent compute nodes. For smaller workloads, a `/24` or `/23` may be sufficient.
 
 ---
 
@@ -246,7 +254,7 @@ export DATABRICKS_HOST="https://accounts.gcp.databricks.com"
 export DATABRICKS_TOKEN="dapi_your_account_level_token_here"
 ```
 
-> **Tip:** Add the `export` lines to your `~/.zshrc` or `~/.bashrc` to persist them.
+> **Tip:** Add the `export` lines to your `~/.zshrc` or `~/.bashrc` to persist them across sessions.
 
 </details>
 
@@ -262,7 +270,7 @@ $env:DATABRICKS_HOST = "https://accounts.gcp.databricks.com"
 $env:DATABRICKS_TOKEN = "dapi_your_account_level_token_here"
 ```
 
-> **Tip:** To persist environment variables, use System Properties > Environment Variables, or:
+> **Tip:** To persist environment variables across sessions:
 > ```powershell
 > [Environment]::SetEnvironmentVariable("DATABRICKS_HOST", "https://accounts.gcp.databricks.com", "User")
 > [Environment]::SetEnvironmentVariable("DATABRICKS_TOKEN", "dapi_your_token", "User")
@@ -327,10 +335,8 @@ gcp_region            = "us-central1"                            # Desired regio
 workspace_name        = "my-databricks-workspace"                # Name for the workspace
 vpc_name              = "databricks-vpc"                         # Name for the VPC
 
-# Adjust CIDR ranges only if they conflict with your existing network
-subnet_ip_cidr_range  = "10.0.0.0/20"
-pod_ip_cidr_range     = "10.1.0.0/16"
-service_ip_cidr_range = "10.2.0.0/20"
+# Each GCE compute node uses 2 IPs — /20 supports ~2,000 concurrent nodes
+subnet_ip_cidr_range = "10.0.0.0/20"
 ```
 
 ---
@@ -364,7 +370,7 @@ terraform plan
 This shows you **exactly** what Terraform will create. Review the output carefully:
 
 ```
-Plan: 7 to add, 0 to change, 0 to destroy.
+Plan: 6 to add, 0 to change, 0 to destroy.
 ```
 
 You should see these resources:
@@ -388,7 +394,7 @@ terraform apply
 
 Type `yes` when prompted to confirm.
 
-> **This takes 5-15 minutes.** Terraform creates the VPC and networking resources first, then provisions the Databricks workspace (which involves setting up a GKE cluster behind the scenes).
+> **This takes 5-15 minutes.** Terraform creates the VPC and networking resources first, then provisions the Databricks workspace which sets up the GCE-based compute plane in your VPC.
 
 Expected final output:
 ```
@@ -424,9 +430,7 @@ terraform output workspace_url
 | `gcp_region` | GCP region | `string` | `us-central1` | No |
 | `workspace_name` | Workspace name | `string` | `databricks-workspace` | No |
 | `vpc_name` | VPC name | `string` | `databricks-vpc` | No |
-| `subnet_ip_cidr_range` | Node subnet CIDR | `string` | `10.0.0.0/20` | No |
-| `pod_ip_cidr_range` | Pod secondary range CIDR | `string` | `10.1.0.0/16` | No |
-| `service_ip_cidr_range` | Service secondary range CIDR | `string` | `10.2.0.0/20` | No |
+| `subnet_ip_cidr_range` | Compute subnet CIDR (2 IPs per node) | `string` | `10.0.0.0/20` | No |
 
 ## Outputs
 
@@ -442,22 +446,11 @@ terraform output workspace_url
 
 ## Customization
 
-### Full Private Connectivity
-
-To make the GKE master private as well, change the `gke_config` in `workspace.tf`:
-
-```hcl
-gke_config {
-  connectivity_type = "PRIVATE_NODE_PRIVATE_MASTER"
-  master_ip_range   = "10.3.0.0/28"
-}
-```
-
-> **Note:** This requires additional configuration such as Private Service Connect (PSC) or VPN to reach the Databricks control plane.
-
 ### CIDR Ranges
 
-Adjust the CIDR ranges in `terraform.tfvars` to fit your existing network topology. Ensure there are **no overlaps** with other VPCs if you plan to use VPC peering.
+Adjust the subnet CIDR in `terraform.tfvars` to fit your existing network topology. With GCE compute, you only need **one subnet range** — no secondary ranges for pods or services.
+
+Ensure there are **no overlaps** with other VPCs if you plan to use VPC peering.
 
 ### Available GCP Regions
 
@@ -473,6 +466,10 @@ Some common regions for Databricks on GCP:
 | `asia-southeast1` | Singapore |
 | `southamerica-east1` | Sao Paulo, Brazil |
 
+### Private Service Connect (PSC)
+
+For fully private connectivity (no public internet path to the Databricks control plane), you can configure Private Service Connect. This requires additional Terraform resources — see the [Databricks PSC documentation](https://docs.gcp.databricks.com/en/security/network/classic/private-service-connect.html).
+
 ---
 
 ## Troubleshooting
@@ -481,7 +478,7 @@ Some common regions for Databricks on GCP:
 |---|---|
 | `Error: Permission denied` on GCP | Run `gcloud auth application-default login` and ensure your account has **Owner** or **Editor** role on the project |
 | `Error: Account API unauthorized` | Verify `DATABRICKS_HOST` and `DATABRICKS_TOKEN` are set correctly. Token must be **account-level**, not workspace-level |
-| `Error: CIDR range conflict` | Change the CIDR ranges in `terraform.tfvars` to avoid overlaps with existing subnets in your project |
+| `Error: CIDR range conflict` | Change the subnet CIDR in `terraform.tfvars` to avoid overlaps with existing subnets in your project |
 | `Error: API not enabled` | Run the `gcloud services enable` commands from Step 3 |
 | `terraform init` fails | Check your internet connection. If behind a proxy, set `HTTP_PROXY` and `HTTPS_PROXY` environment variables |
 | Workspace stuck provisioning | This can take up to 15 minutes. If it exceeds 30 minutes, check the Databricks account console for errors |
