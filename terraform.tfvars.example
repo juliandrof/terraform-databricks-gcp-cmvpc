@@ -1,9 +1,11 @@
-databricks_account_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-gcp_project_id        = "my-gcp-project"
-gcp_region            = "us-central1"
-workspace_name        = "my-databricks-workspace"
-vpc_name              = "databricks-vpc"
+google_service_account_email = "<sa>@<projeto>.iam.gserviceaccount.com"
+gcp_project_id               = "<id-do-projeto>"
+gcp_region                   = "us-central1"
 
-# Adjust CIDR range as needed — each GCE compute node uses 2 IPs
-# /20 supports ~2,000 concurrent nodes
+databricks_account_id   = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+workspace_name          = "meu-workspace-databricks"
+databricks_admin_user   = "admin@empresa.com"
+
+# Ajuste o range CIDR conforme necessário — cada nó GCE usa 2 IPs
+# /20 suporta ~2.000 nós simultâneos
 subnet_ip_cidr_range = "10.0.0.0/20"

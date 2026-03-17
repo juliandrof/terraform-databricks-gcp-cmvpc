@@ -1,68 +1,74 @@
 flowchart TB
-    CONSOLE["Databricks Account Console\naccounts.gcp.databricks.com\nWorkspace Lifecycle Management"]
+    CONSOLE["Console de Contas Databricks<br/>accounts.gcp.databricks.com"]
 
-    subgraph GCP ["  GCP Project  "]
+    subgraph GCP ["Projeto GCP"]
         direction TB
 
-        subgraph CP ["  Databricks Control Plane  (Managed by Databricks)  "]
+        subgraph CP ["Plano de Controle Databricks  —  Gerenciado pela Databricks"]
             direction LR
-            MWS["MWS API\nWorkspace provisioning\nand network configuration"]
-            DBAPI["Databricks REST API\nCluster and job management"]
+            MWS["API MWS<br/>Provisionamento de Workspace<br/>e Configuracao de Rede"]
+            REST["API REST Databricks<br/>Gerenciamento de Clusters e Jobs"]
+            WS["Workspace Databricks<br/>(Criado e Ativo)"]
         end
 
-        subgraph CMVPC ["  Customer-Managed VPC  "]
+        NET_CFG["Configuracao de Rede<br/>(Registro da VPC do Cliente)"]
+
+        subgraph CMVPC ["VPC Gerenciada pelo Cliente"]
             direction TB
 
-            FW["Firewall Rules\nAllow internal TCP/UDP\nbetween compute nodes"]
-
-            subgraph SUBNET ["  Subnet  10.0.0.0/20  "]
+            subgraph SUBNET ["Subnet  10.0.0.0/20"]
                 direction LR
-                GCE1["GCE VM Instance\nDriver Node\nPrivate IP only"]
-                GCE2["GCE VM Instance\nWorker Node\nPrivate IP only"]
-                GCE3["GCE VM Instance\nWorker Node\nPrivate IP only"]
+                GCE1["VM GCE — Driver<br/>(IP Privado)"]
+                GCE2["VM GCE — Worker<br/>(IP Privado)"]
+                GCE3["VM GCE — Worker<br/>(IP Privado)"]
             end
 
-            subgraph EGRESS ["  Outbound Internet Access  "]
-                direction LR
-                ROUTER["Cloud Router\nDynamic routing"]
-                NAT["Cloud NAT\nOutbound internet for\nprivate VMs — no inbound"]
-            end
+            ROUTER["Cloud Router<br/>Roteamento Dinamico"]
+            NAT["Cloud NAT<br/>Acesso a Internet de Saida<br/>(sem trafego inbound)"]
         end
+
+        ADMIN["Usuario Admin<br/>(adicionado via Provider Workspace)"]
     end
 
-    INTERNET(("Internet\n(Databricks CP\nand package repos)"))
+    INTERNET(("Internet<br/>Egress Only"))
 
-    CONSOLE -->|"MWS API calls HTTPS"| MWS
-    MWS -->|"Provisions workspace\nand network config"| CMVPC
-    DBAPI -->|"Launch and manage clusters"| GCE1
-    DBAPI -->|"Launch and manage clusters"| GCE2
-    DBAPI -->|"Launch and manage clusters"| GCE3
+    CONSOLE -->|"1 — Chamadas API MWS via HTTPS"| MWS
+    MWS -->|"2 — Registra VPC, Subnet<br/>e Configuracao de Rede"| NET_CFG
+    NET_CFG -->|"3 — Associa Rede ao Workspace"| WS
+    REST -->|"4 — Gerencia recursos<br/>do Workspace"| WS
+    WS -->|"5 — Provisiona VMs GCE"| GCE1
+    WS -->|"5 — Provisiona VMs GCE"| GCE2
+    WS -->|"5 — Provisiona VMs GCE"| GCE3
 
-    FW -->|"Protects"| SUBNET
-    GCE1 <-->|"Spark shuffle\nand heartbeat"| GCE2
-    GCE1 <-->|"Spark shuffle\nand heartbeat"| GCE3
-    GCE2 <-->|"Spark shuffle\nand heartbeat"| GCE3
+    GCE1 <-->|"Spark Shuffle / Heartbeat"| GCE2
+    GCE1 <-->|"Spark Shuffle / Heartbeat"| GCE3
+    GCE2 <-->|"Spark Shuffle / Heartbeat"| GCE3
 
-    SUBNET -->|"Outbound traffic\nvia NAT"| ROUTER
-    ROUTER --> NAT
-    NAT -->|"Egress only HTTPS"| INTERNET
+    SUBNET -->|"Trafego de saida das VMs"| ROUTER
+    ROUTER -->|"Traducao de enderecos"| NAT
+    NAT -->|"Saida HTTPS — Egress Only"| INTERNET
 
-    classDef externalNode fill:#1a73e8,stroke:#0d47a1,color:#ffffff
-    classDef apiNode fill:#e8f0fe,stroke:#4285f4,color:#1a237e
-    classDef gceNode fill:#fce8b2,stroke:#f9ab00,color:#3e2723
-    classDef networkNode fill:#d2e3fc,stroke:#1a73e8,color:#1a237e
-    classDef fwNode fill:#fde7e0,stroke:#d93025,color:#b31412
-    classDef internetNode fill:#607d8b,stroke:#455a64,color:#ffffff
+    WS -->|"6 — Adiciona ao Workspace<br/>apos criacao"| ADMIN
+
+    classDef externalNode fill:#1565C0,stroke:#0D47A1,color:#ffffff,font-weight:bold
+    classDef apiNode fill:#E8EAF6,stroke:#3949AB,color:#1A237E,font-weight:bold
+    classDef wsNode fill:#7B1FA2,stroke:#4A148C,color:#ffffff,font-weight:bold
+    classDef netCfgNode fill:#E3F2FD,stroke:#1565C0,color:#0D47A1,font-weight:bold
+    classDef gceNode fill:#FF8F00,stroke:#E65100,color:#ffffff,font-weight:bold
+    classDef networkNode fill:#2E7D32,stroke:#1B5E20,color:#ffffff,font-weight:bold
+    classDef internetNode fill:#546E7A,stroke:#37474F,color:#ffffff,font-weight:bold
+    classDef adminNode fill:#00838F,stroke:#006064,color:#ffffff,font-weight:bold
 
     class CONSOLE externalNode
-    class MWS,DBAPI apiNode
+    class MWS,REST apiNode
+    class WS wsNode
+    class NET_CFG netCfgNode
     class GCE1,GCE2,GCE3 gceNode
     class ROUTER,NAT networkNode
-    class FW fwNode
     class INTERNET internetNode
+    class ADMIN adminNode
 
-    style GCP fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px,color:#1b5e20
-    style CP fill:#e8eaf6,stroke:#3949ab,stroke-width:2px,color:#1a237e
-    style CMVPC fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
-    style SUBNET fill:#fffde7,stroke:#f9a825,stroke-width:2px,color:#4e342e
-    style EGRESS fill:#e0f7fa,stroke:#0097a7,stroke-width:2px,color:#006064
+    style GCP fill:#FFF8E1,stroke:#F9A825,stroke-width:3px,color:#E65100
+    style CP fill:#E8EAF6,stroke:#3949AB,stroke-width:2px,color:#1A237E
+    style CMVPC fill:#E8F5E9,stroke:#43A047,stroke-width:2px,color:#1B5E20
+    style SUBNET fill:#FFF3E0,stroke:#FB8C00,stroke-width:2px,color:#4E342E

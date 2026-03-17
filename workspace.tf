@@ -1,15 +1,15 @@
 # -----------------------------------------------------------------------------
-# Register the customer-managed VPC as a Databricks network configuration,
-# then create the workspace that uses it.
+# Registra a VPC gerenciada pelo cliente como configuração de rede Databricks,
+# cria o workspace e adiciona o usuário admin.
 #
-# Databricks on GCP uses GCE (Google Compute Engine) VMs for its compute plane.
-# No GKE configuration or secondary IP ranges are needed.
+# Databricks no GCP usa VMs GCE (Google Compute Engine) no plano de compute.
+# Não é necessário configuração de GKE nem ranges secundários de IP.
 # -----------------------------------------------------------------------------
 
 resource "databricks_mws_networks" "this" {
   provider     = databricks.accounts
   account_id   = var.databricks_account_id
-  network_name = "${var.workspace_name}-network"
+  network_name = "databricks-network-${random_string.suffix.result}"
 
   gcp_network_info {
     network_project_id = var.gcp_project_id
@@ -32,4 +32,20 @@ resource "databricks_mws_workspaces" "this" {
   }
 
   network_id = databricks_mws_networks.this.network_id
+}
+
+# -----------------------------------------------------------------------------
+# Configuração pós-criação: adiciona usuário admin ao workspace
+# -----------------------------------------------------------------------------
+
+data "databricks_group" "admins" {
+  depends_on   = [databricks_mws_workspaces.this]
+  provider     = databricks.workspace
+  display_name = "admins"
+}
+
+resource "databricks_user" "admin" {
+  depends_on = [databricks_mws_workspaces.this]
+  provider   = databricks.workspace
+  user_name  = var.databricks_admin_user
 }

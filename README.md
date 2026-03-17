@@ -1,120 +1,125 @@
 <p align="center">
-  <img src="images/architecture.png" alt="Architecture Diagram" width="800"/>
+  <img src="images/architecture.png" alt="Diagrama de Arquitetura" width="800"/>
 </p>
 
-<h1 align="center">Databricks Workspace on GCP<br/>Customer-Managed VPC</h1>
+<h1 align="center">Workspace Databricks no GCP<br/>VPC Gerenciada pelo Cliente</h1>
 
 <p align="center">
-  <strong>Terraform configuration to deploy a Databricks workspace on Google Cloud Platform using a customer-managed VPC with GCE-based compute, giving you full control over network topology, IP ranges, and security boundaries.</strong>
+  <strong>Configuração Terraform para provisionar um workspace Databricks no Google Cloud Platform usando uma VPC gerenciada pelo cliente com compute baseado em GCE, garantindo controle total sobre topologia de rede, ranges de IP e perímetros de segurança.</strong>
 </p>
 
 <p align="center">
-  <a href="#architecture">Architecture</a> •
-  <a href="#whats-included">What's Included</a> •
-  <a href="#prerequisites">Prerequisites</a> •
-  <a href="#step-by-step-deployment">Step-by-Step</a> •
-  <a href="#variables">Variables</a> •
-  <a href="#customization">Customization</a>
+  <a href="#arquitetura">Arquitetura</a> •
+  <a href="#o-que-é-criado">O que é criado</a> •
+  <a href="#pré-requisitos">Pré-requisitos</a> •
+  <a href="#passo-a-passo">Passo a passo</a> •
+  <a href="#variáveis">Variáveis</a> •
+  <a href="#personalização">Personalização</a>
 </p>
 
 ---
 
-## Architecture
+## Arquitetura
 
 <p align="center">
-  <img src="images/architecture.png" alt="Architecture Overview" width="800"/>
+  <img src="images/architecture.png" alt="Visão Geral da Arquitetura" width="800"/>
 </p>
 
-Databricks on GCP uses **Google Compute Engine (GCE)** VMs for its compute plane. This deployment creates a **customer-managed VPC** in your GCP project and provisions a Databricks workspace that runs all compute nodes as GCE VM instances within your VPC — with **no public IPs**.
+O Databricks no GCP utiliza **Google Compute Engine (GCE)** para seu plano de compute. Esta configuração cria uma **VPC gerenciada pelo cliente** no seu projeto GCP e provisiona um workspace Databricks que executa todos os nós de compute como VMs GCE dentro da sua VPC — **sem IPs públicos**.
 
-> **Note:** Databricks previously used GKE (Google Kubernetes Engine) for its GCP compute plane. As of 2024, all new workspaces use **GCE-based compute**, which offers simpler networking (no secondary IP ranges for pods/services) and faster cluster startup times.
+> **Nota:** O Databricks anteriormente usava GKE (Google Kubernetes Engine) no GCP. A partir de 2024, todos os novos workspaces utilizam **compute baseado em GCE**, que oferece rede mais simples (sem ranges secundários para pods/services) e inicialização de clusters mais rápida.
 
-## What's Included
+## O que é criado
 
-| Resource | Description |
+| Recurso | Descrição |
 |---|---|
-| **VPC** | Custom-mode VPC with no auto-created subnets |
-| **Subnet** | Regional subnet with a single primary IP range for GCE compute nodes |
-| **Firewall** | Allows all internal traffic between compute nodes |
-| **Cloud Router + NAT** | Outbound internet access for private GCE VMs |
-| **Databricks Network** | MWS network configuration pointing to the customer VPC |
-| **Databricks Workspace** | Workspace provisioned with GCE-based compute in your VPC |
+| **VPC** | VPC custom-mode sem subnets automáticas |
+| **Subnet** | Subnet regional com um único range primário de IP para nós GCE |
+| **Cloud Router + NAT** | Acesso à internet de saída para VMs GCE privadas |
+| **Rede Databricks** | Configuração de rede MWS apontando para a VPC do cliente |
+| **Workspace Databricks** | Workspace provisionado com compute GCE na sua VPC |
+| **Usuário Admin** | Usuário administrador adicionado ao workspace após criação |
 
-### Network Layout
+> **Nota:** Não é criada regra de firewall explícita — o Databricks gerencia suas próprias regras de firewall na VPC durante o provisionamento do workspace.
+
+> **Nota:** Todos os nomes de recursos incluem um **sufixo aleatório de 3 caracteres** para evitar colisão de nomes ao executar múltiplas vezes no mesmo projeto.
+
+### Layout de Rede
 
 <p align="center">
-  <img src="images/network.png" alt="Network CIDR Diagram" width="700"/>
+  <img src="images/network.png" alt="Diagrama de Rede CIDR" width="700"/>
 </p>
 
-With GCE-based compute, the networking is straightforward — you only need **one primary subnet range**. Each Databricks compute node uses **2 IP addresses** from the subnet.
+Com compute baseado em GCE, a rede é simples — você precisa apenas de **um range de subnet primário**. Cada nó de compute Databricks utiliza **2 endereços IP** da subnet.
 
-| Subnet CIDR | Usable IPs | Max Concurrent Nodes |
+| CIDR da Subnet | IPs Disponíveis | Máximo de Nós Simultâneos |
 |---|---|---|
 | `/25` | 126 | ~60 |
 | `/24` | 254 | ~120 |
 | `/23` | 510 | ~250 |
-| `/22` | 1,022 | ~500 |
-| `/21` | 2,046 | ~1,000 |
-| `/20` | 4,094 | ~2,000 |
+| `/22` | 1.022 | ~500 |
+| `/21` | 2.046 | ~1.000 |
+| `/20` | 4.094 | ~2.000 |
 
-> **Tip:** The default `/20` supports up to ~2,000 concurrent compute nodes. For smaller workloads, a `/24` or `/23` may be sufficient.
-
----
-
-## Prerequisites
-
-Before starting, make sure you have:
-
-- A **GCP project** with billing enabled
-- A **Databricks account** on GCP with **account-level admin** access
-- Your **Databricks Account ID** (found in the [account console](https://accounts.gcp.databricks.com))
+> **Dica:** O padrão `/20` suporta até ~2.000 nós de compute simultâneos. Para cargas menores, um `/24` ou `/23` pode ser suficiente.
 
 ---
 
-## Deployment Workflow
+## Pré-requisitos
+
+Antes de começar, você precisa ter:
+
+- Um **projeto GCP** com faturamento habilitado
+- Uma **conta Databricks** no GCP com acesso de **admin de conta**
+- Seu **Databricks Account ID** (encontrado no [console de contas](https://accounts.gcp.databricks.com))
+- Uma **Google Service Account (GSA)** com permissões para criar recursos de rede
+
+---
+
+## Fluxo de Deploy
 
 <p align="center">
-  <img src="images/workflow.png" alt="Deployment Workflow" width="600"/>
+  <img src="images/workflow.png" alt="Fluxo de Deploy" width="600"/>
 </p>
 
 ---
 
-## Step-by-Step Deployment
+## Passo a passo
 
-### Step 1 — Install Terraform
+### Passo 1 — Instalar o Terraform
 
 <details>
 <summary><strong>macOS</strong></summary>
 
-#### Option A: Using Homebrew (recommended)
+#### Opção A: Usando Homebrew (recomendado)
 
 ```bash
-# Install Homebrew if you don't have it
+# Instalar o Homebrew se não tiver
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Install Terraform
+# Instalar o Terraform
 brew tap hashicorp/tap
 brew install hashicorp/tap/terraform
 
-# Verify installation
+# Verificar instalação
 terraform -version
 ```
 
-#### Option B: Manual download
+#### Opção B: Download manual
 
 ```bash
-# Download the binary (Apple Silicon)
+# Baixar o binário (Apple Silicon)
 curl -LO https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_darwin_arm64.zip
 
-# For Intel Macs, use:
+# Para Macs Intel, use:
 # curl -LO https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_darwin_amd64.zip
 
-# Unzip and move to PATH
+# Descompactar e mover para o PATH
 unzip terraform_*.zip
 sudo mv terraform /usr/local/bin/
 rm terraform_*.zip
 
-# Verify
+# Verificar
 terraform -version
 ```
 
@@ -123,72 +128,72 @@ terraform -version
 <details>
 <summary><strong>Windows</strong></summary>
 
-#### Option A: Using Chocolatey (recommended)
+#### Opção A: Usando Chocolatey (recomendado)
 
 ```powershell
-# Open PowerShell as Administrator
+# Abrir PowerShell como Administrador
 
-# Install Chocolatey if you don't have it
+# Instalar o Chocolatey se não tiver
 Set-ExecutionPolicy Bypass -Scope Process -Force
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
 iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 
-# Install Terraform
+# Instalar o Terraform
 choco install terraform -y
 
-# Restart your terminal, then verify
+# Reiniciar o terminal, depois verificar
 terraform -version
 ```
 
-#### Option B: Using winget
+#### Opção B: Usando winget
 
 ```powershell
 winget install Hashicorp.Terraform
 
-# Restart your terminal, then verify
+# Reiniciar o terminal, depois verificar
 terraform -version
 ```
 
-#### Option C: Manual download
+#### Opção C: Download manual
 
-1. Download from [terraform.io/downloads](https://developer.hashicorp.com/terraform/downloads)
-2. Extract the `terraform.exe` file
-3. Move it to a directory in your `PATH` (e.g., `C:\terraform\`)
-4. Add that directory to your system PATH:
+1. Baixe em [terraform.io/downloads](https://developer.hashicorp.com/terraform/downloads)
+2. Extraia o arquivo `terraform.exe`
+3. Mova para um diretório no seu `PATH` (ex: `C:\terraform\`)
+4. Adicione o diretório ao PATH do sistema:
    ```powershell
-   # PowerShell (run as Administrator)
+   # PowerShell (executar como Administrador)
    [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\terraform", "Machine")
    ```
-5. Restart your terminal and verify: `terraform -version`
+5. Reinicie o terminal e verifique: `terraform -version`
 
 </details>
 
 ---
 
-### Step 2 — Install Google Cloud SDK (`gcloud`)
+### Passo 2 — Instalar o Google Cloud SDK (`gcloud`)
 
 <details>
 <summary><strong>macOS</strong></summary>
 
-#### Using Homebrew
+#### Usando Homebrew
 
 ```bash
 brew install --cask google-cloud-sdk
 
-# Initialize gcloud
+# Inicializar o gcloud
 gcloud init
 ```
 
-#### Manual install
+#### Instalação manual
 
 ```bash
-# Download and run the installer
+# Baixar e executar o instalador
 curl https://sdk.cloud.google.com | bash
 
-# Restart your shell
+# Reiniciar o shell
 exec -l $SHELL
 
-# Initialize
+# Inicializar
 gcloud init
 ```
 
@@ -197,17 +202,17 @@ gcloud init
 <details>
 <summary><strong>Windows</strong></summary>
 
-#### Using the installer (recommended)
+#### Usando o instalador (recomendado)
 
-1. Download the installer from [cloud.google.com/sdk/docs/install](https://cloud.google.com/sdk/docs/install#windows)
-2. Run `GoogleCloudSDKInstaller.exe`
-3. Follow the prompts (keep defaults)
-4. The installer will open a terminal — run `gcloud init` when prompted
+1. Baixe o instalador em [cloud.google.com/sdk/docs/install](https://cloud.google.com/sdk/docs/install#windows)
+2. Execute `GoogleCloudSDKInstaller.exe`
+3. Siga os prompts (mantenha os padrões)
+4. O instalador abrirá um terminal — execute `gcloud init` quando solicitado
 
-#### Using PowerShell
+#### Usando PowerShell
 
 ```powershell
-# Download and run
+# Baixar e executar
 (New-Object Net.WebClient).DownloadFile("https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe", "$env:Temp\GoogleCloudSDKInstaller.exe")
 & $env:Temp\GoogleCloudSDKInstaller.exe
 ```
@@ -216,18 +221,18 @@ gcloud init
 
 ---
 
-### Step 3 — Enable Required GCP APIs
+### Passo 3 — Habilitar APIs obrigatórias no GCP
 
-Run these commands to enable the APIs Databricks needs in your GCP project:
+Execute estes comandos para habilitar as APIs que o Databricks necessita no seu projeto GCP:
 
 <details>
-<summary><strong>macOS / Windows (same commands)</strong></summary>
+<summary><strong>macOS / Windows (mesmos comandos)</strong></summary>
 
 ```bash
-# Set your project
-gcloud config set project YOUR_PROJECT_ID
+# Definir o projeto
+gcloud config set project SEU_PROJECT_ID
 
-# Enable required APIs
+# Habilitar APIs obrigatórias
 gcloud services enable compute.googleapis.com
 gcloud services enable container.googleapis.com
 gcloud services enable cloudresourcemanager.googleapis.com
@@ -238,57 +243,132 @@ gcloud services enable iam.googleapis.com
 
 ---
 
-### Step 4 — Authenticate
+### Passo 4 — Criar e configurar Service Accounts
 
-You need two sets of credentials: **GCP** and **Databricks Account API**.
+A autenticação usa **Google Service Account** com impersonação — sem PAT tokens de longa duração.
 
 <details>
-<summary><strong>macOS</strong></summary>
+<summary><strong>Configuração básica (rápida)</strong></summary>
+
+Use uma Service Account existente com `roles/Owner` no projeto:
 
 ```bash
-# 1. Authenticate with GCP (opens browser)
-gcloud auth application-default login
+# Definir o projeto
+gcloud config set project SEU_PROJECT_ID
 
-# 2. Set Databricks account-level credentials
-export DATABRICKS_HOST="https://accounts.gcp.databricks.com"
-export DATABRICKS_TOKEN="dapi_your_account_level_token_here"
+# Configurar impersonação da Service Account
+gcloud config set auth/impersonate_service_account SUA_SA@SEU_PROJETO.iam.gserviceaccount.com
+
+# Gerar token de acesso
+export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
 ```
-
-> **Tip:** Add the `export` lines to your `~/.zshrc` or `~/.bashrc` to persist them across sessions.
 
 </details>
 
 <details>
-<summary><strong>Windows</strong></summary>
+<summary><strong>Configuração recomendada (com menor privilégio)</strong></summary>
 
-```powershell
-# 1. Authenticate with GCP (opens browser)
-gcloud auth application-default login
+Para ambientes de produção, crie duas Service Accounts separadas:
 
-# 2. Set Databricks account-level credentials
-$env:DATABRICKS_HOST = "https://accounts.gcp.databricks.com"
-$env:DATABRICKS_TOKEN = "dapi_your_account_level_token_here"
+#### 1. Criar a `caller-sa` (baixo privilégio)
+
+```bash
+gcloud iam service-accounts create caller-sa \
+  --display-name="Caller Service Account"
+
+# Conceder role de Token Creator
+gcloud projects add-iam-policy-binding SEU_PROJECT_ID \
+  --member="serviceAccount:caller-sa@SEU_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountTokenCreator"
 ```
 
-> **Tip:** To persist environment variables across sessions:
-> ```powershell
-> [Environment]::SetEnvironmentVariable("DATABRICKS_HOST", "https://accounts.gcp.databricks.com", "User")
-> [Environment]::SetEnvironmentVariable("DATABRICKS_TOKEN", "dapi_your_token", "User")
-> ```
+#### 2. Criar a `privileged-sa` (permissões de provisionamento)
+
+```bash
+gcloud iam service-accounts create privileged-sa \
+  --display-name="Privileged Service Account"
+```
+
+#### 3. Criar role customizada com permissões mínimas
+
+```bash
+cat << 'EOF' > databricks-admin-role.yaml
+title: "Databricks Admin"
+description: "Role customizada com permissões para criação de workspace Databricks"
+stage: "GA"
+includedPermissions:
+- iam.roles.get
+- iam.roles.create
+- iam.roles.delete
+- iam.roles.update
+- iam.serviceAccounts.getIamPolicy
+- iam.serviceAccounts.setIamPolicy
+- resourcemanager.projects.get
+- resourcemanager.projects.getIamPolicy
+- resourcemanager.projects.setIamPolicy
+- serviceusage.services.enable
+- serviceusage.services.get
+- serviceusage.services.list
+- compute.networks.get
+- compute.networks.create
+- compute.networks.updatePolicy
+- compute.subnetworks.get
+- compute.subnetworks.create
+- compute.subnetworks.getIamPolicy
+- compute.subnetworks.setIamPolicy
+- compute.routers.get
+- compute.routers.create
+- compute.routers.delete
+- compute.routers.update
+- compute.projects.get
+- compute.firewalls.get
+- compute.firewalls.create
+- iam.serviceAccountKeys.create
+- iam.serviceAccounts.get
+- iam.serviceAccounts.update
+- iam.serviceAccounts.delete
+EOF
+
+gcloud iam roles create DatabricksAdmin \
+  --project=SEU_PROJECT_ID \
+  --file=databricks-admin-role.yaml
+
+# Vincular a role à privileged-sa
+gcloud projects add-iam-policy-binding SEU_PROJECT_ID \
+  --member="serviceAccount:privileged-sa@SEU_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="projects/SEU_PROJECT_ID/roles/DatabricksAdmin"
+```
+
+#### 4. Autenticar com impersonação
+
+```bash
+# Baixar a chave da caller-sa
+gcloud iam service-accounts keys create caller-sa-key.json \
+  --iam-account=caller-sa@SEU_PROJECT_ID.iam.gserviceaccount.com
+
+# Ativar autenticação
+gcloud auth activate-service-account --key-file=caller-sa-key.json
+
+# Configurar impersonação da privileged-sa
+export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/caller-sa-key.json"
+gcloud config set auth/impersonate_service_account privileged-sa@SEU_PROJECT_ID.iam.gserviceaccount.com
+
+# Gerar token
+export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+```
 
 </details>
 
-#### How to get your Databricks Account Token
+#### Adicionar a Service Account ao Databricks
 
-1. Go to [accounts.gcp.databricks.com](https://accounts.gcp.databricks.com)
-2. Log in with your account admin credentials
-3. Click on your **user icon** (top-right) > **User Settings**
-4. Go to **Access tokens** > **Generate new token**
-5. Give it a description and copy the token
+1. Acesse [accounts.gcp.databricks.com](https://accounts.gcp.databricks.com)
+2. Faça login com suas credenciais de admin
+3. [Adicione](https://docs.gcp.databricks.com/administration-guide/users-groups/users.html#add-users-to-your-account-using-the-account-console) a Service Account (`privileged-sa` ou a SA que escolheu) como usuário da conta
+4. [Atribua](https://docs.gcp.databricks.com/administration-guide/users-groups/users.html#assign-account-admin-roles-to-a-user) a role de **admin de conta** à Service Account
 
 ---
 
-### Step 5 — Clone This Repository
+### Passo 5 — Clonar este repositório
 
 <details>
 <summary><strong>macOS</strong></summary>
@@ -308,112 +388,129 @@ git clone https://github.com/juliandrof/terraform-databricks-gcp-cmvpc.git
 cd terraform-databricks-gcp-cmvpc
 ```
 
-> **Don't have Git?** Install it: `winget install Git.Git` or download from [git-scm.com](https://git-scm.com/download/win)
+> **Não tem Git?** Instale: `winget install Git.Git` ou baixe em [git-scm.com](https://git-scm.com/download/win)
 
 </details>
 
 ---
 
-### Step 6 — Configure Variables
+### Passo 6 — Configurar variáveis
 
 ```bash
-# Copy the example file
+# Copiar o arquivo de exemplo
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-On Windows (PowerShell):
+No Windows (PowerShell):
 ```powershell
 Copy-Item terraform.tfvars.example terraform.tfvars
 ```
 
-Edit `terraform.tfvars` with your values:
+Edite o `terraform.tfvars` com seus valores:
 
 ```hcl
-databricks_account_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # From account console
-gcp_project_id        = "my-gcp-project"                        # Your GCP project ID
-gcp_region            = "us-central1"                            # Desired region
-workspace_name        = "my-databricks-workspace"                # Name for the workspace
-vpc_name              = "databricks-vpc"                         # Name for the VPC
+google_service_account_email = "privileged-sa@meu-projeto.iam.gserviceaccount.com"
+gcp_project_id               = "meu-projeto-gcp"
+gcp_region                   = "us-central1"
 
-# Each GCE compute node uses 2 IPs — /20 supports ~2,000 concurrent nodes
+databricks_account_id   = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Do console de contas
+workspace_name          = "meu-workspace-databricks"
+databricks_admin_user   = "admin@minhaempresa.com"
+
+# Cada nó GCE usa 2 IPs — /20 suporta ~2.000 nós simultâneos
 subnet_ip_cidr_range = "10.0.0.0/20"
+```
+
+Alternativamente, passe as variáveis via CLI:
+
+```bash
+terraform plan \
+  -var 'google_service_account_email=sa@projeto.iam.gserviceaccount.com' \
+  -var 'gcp_project_id=meu-projeto' \
+  -var 'gcp_region=us-central1' \
+  -var 'databricks_account_id=xxxx-xxxx-xxxx' \
+  -var 'workspace_name=meu-workspace' \
+  -var 'databricks_admin_user=admin@empresa.com' \
+  -var 'subnet_ip_cidr_range=10.0.0.0/20'
 ```
 
 ---
 
-### Step 7 — Initialize Terraform
+### Passo 7 — Inicializar o Terraform
 
-This downloads the required providers (Databricks + Google).
+Este comando baixa os providers necessários (Databricks + Google + Random).
 
 ```bash
 terraform init
 ```
 
-Expected output:
+Saída esperada:
 ```
 Initializing the backend...
 Initializing provider plugins...
 - Installing databricks/databricks...
 - Installing hashicorp/google...
+- Installing hashicorp/random...
 
 Terraform has been successfully initialized!
 ```
 
 ---
 
-### Step 8 — Review the Plan
+### Passo 8 — Revisar o plano
 
 ```bash
 terraform plan
 ```
 
-This shows you **exactly** what Terraform will create. Review the output carefully:
+Isso mostra **exatamente** o que o Terraform vai criar. Revise a saída:
 
 ```
-Plan: 6 to add, 0 to change, 0 to destroy.
+Plan: 8 to add, 0 to change, 0 to destroy.
 ```
 
-You should see these resources:
+Você deve ver estes recursos:
+- `random_string.suffix`
 - `google_compute_network.databricks_vpc`
 - `google_compute_subnetwork.databricks_subnet`
-- `google_compute_firewall.databricks_internal`
 - `google_compute_router.databricks_router`
 - `google_compute_router_nat.databricks_nat`
 - `databricks_mws_networks.this`
 - `databricks_mws_workspaces.this`
+- `databricks_user.admin`
 
-> If something doesn't look right, go back to Step 6 and adjust your `terraform.tfvars`.
+> Se algo não parecer correto, volte ao Passo 6 e ajuste seu `terraform.tfvars`.
 
 ---
 
-### Step 9 — Deploy
+### Passo 9 — Provisionar
 
 ```bash
 terraform apply
 ```
 
-Type `yes` when prompted to confirm.
+Digite `yes` quando solicitado para confirmar.
 
-> **This takes 5-15 minutes.** Terraform creates the VPC and networking resources first, then provisions the Databricks workspace which sets up the GCE-based compute plane in your VPC.
+> **Isso leva de 5 a 15 minutos.** O Terraform cria a VPC e recursos de rede primeiro, depois provisiona o workspace Databricks que configura o plano de compute GCE na sua VPC e adiciona o usuário admin.
 
-Expected final output:
+Saída final esperada:
 ```
-Apply complete! Resources: 7 added, 0 changed, 0 destroyed.
+Apply complete! Resources: 8 added, 0 changed, 0 destroyed.
 
 Outputs:
 
 workspace_url = "https://xxxxxxxxxxxx.gcp.databricks.com"
 workspace_id  = "1234567890123456"
 network_id    = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-vpc_id        = "projects/my-project/global/networks/databricks-vpc"
-subnet_id     = "projects/my-project/regions/us-central1/subnetworks/databricks-vpc-subnet"
+vpc_id        = "projects/meu-projeto/global/networks/databricks-vpc-a3f"
+subnet_id     = "projects/meu-projeto/regions/us-central1/subnetworks/databricks-subnet-a3f"
 ```
 
 ---
 
-### Step 10 — Access Your Workspace
+### Passo 10 — Acessar o workspace
 
-Open the `workspace_url` from the outputs in your browser. You can also retrieve it anytime:
+Abra a `workspace_url` dos outputs no navegador. Você pode consultar a qualquer momento:
 
 ```bash
 terraform output workspace_url
@@ -421,105 +518,164 @@ terraform output workspace_url
 
 ---
 
-## Variables
+## Validação
 
-| Name | Description | Type | Default | Required |
-|---|---|---|---|---|
-| `databricks_account_id` | Databricks account ID | `string` | — | Yes |
-| `gcp_project_id` | GCP project ID | `string` | — | Yes |
-| `gcp_region` | GCP region | `string` | `us-central1` | No |
-| `workspace_name` | Workspace name | `string` | `databricks-workspace` | No |
-| `vpc_name` | VPC name | `string` | `databricks-vpc` | No |
-| `subnet_ip_cidr_range` | Compute subnet CIDR (2 IPs per node) | `string` | `10.0.0.0/20` | No |
+Após o `apply`, valide que tudo foi criado corretamente:
 
-## Outputs
+```bash
+# Terraform — deve mostrar nenhuma mudança pendente
+terraform validate
+terraform plan
 
-| Name | Description |
-|---|---|
-| `workspace_url` | Databricks workspace URL |
-| `workspace_id` | Databricks workspace ID |
-| `network_id` | Databricks network configuration ID |
-| `vpc_id` | GCP VPC self-link |
-| `subnet_id` | GCP subnet self-link |
+# Recursos de rede no GCP
+gcloud compute networks list --filter="name~^databricks-vpc-" --project SEU_PROJECT_ID
+gcloud compute networks subnets list --filter="name~^databricks-subnet-" --regions SUA_REGIAO --project SEU_PROJECT_ID
+gcloud compute routers list --filter="name~^databricks-router-" --regions SUA_REGIAO --project SEU_PROJECT_ID
+
+# URL do workspace
+terraform output -raw workspace_url
+```
+
+Abra a URL no navegador e verifique se o workspace carrega e se o usuário admin aparece no console de administração do workspace.
 
 ---
 
-## Customization
+## Variáveis
 
-### CIDR Ranges
+| Nome | Descrição | Tipo | Padrão | Obrigatório |
+|---|---|---|---|---|
+| `google_service_account_email` | E-mail da Google Service Account | `string` | — | Sim |
+| `gcp_project_id` | ID do projeto GCP | `string` | — | Sim |
+| `gcp_region` | Região GCP | `string` | `us-central1` | Não |
+| `databricks_account_id` | ID da conta Databricks | `string` | — | Sim |
+| `workspace_name` | Nome do workspace | `string` | `databricks-workspace` | Não |
+| `databricks_admin_user` | E-mail do usuário admin | `string` | — | Sim |
+| `subnet_ip_cidr_range` | CIDR da subnet (2 IPs por nó) | `string` | `10.0.0.0/20` | Não |
 
-Adjust the subnet CIDR in `terraform.tfvars` to fit your existing network topology. With GCE compute, you only need **one subnet range** — no secondary ranges for pods or services.
+## Saídas (Outputs)
 
-Ensure there are **no overlaps** with other VPCs if you plan to use VPC peering.
-
-### Available GCP Regions
-
-Some common regions for Databricks on GCP:
-
-| Region | Location |
+| Nome | Descrição |
 |---|---|
-| `us-central1` | Iowa, USA |
-| `us-east4` | Virginia, USA |
-| `us-west1` | Oregon, USA |
-| `europe-west1` | Belgium |
+| `workspace_url` | URL do workspace Databricks |
+| `workspace_id` | ID do workspace Databricks |
+| `network_id` | ID da configuração de rede Databricks |
+| `vpc_id` | Self-link da VPC no GCP |
+| `subnet_id` | Self-link da subnet no GCP |
+
+---
+
+## Personalização
+
+### Ranges CIDR
+
+Ajuste o CIDR da subnet no `terraform.tfvars` conforme sua topologia de rede existente. Com compute GCE, você precisa apenas de **um range de subnet** — sem ranges secundários para pods ou services.
+
+Garanta que **não haja sobreposição** com outras VPCs se você planeja usar VPC peering.
+
+### Regiões GCP Disponíveis
+
+Algumas regiões comuns para Databricks no GCP:
+
+| Região | Localização |
+|---|---|
+| `us-central1` | Iowa, EUA |
+| `us-east4` | Virgínia, EUA |
+| `us-west1` | Oregon, EUA |
+| `europe-west1` | Bélgica |
 | `europe-west3` | Frankfurt |
-| `asia-southeast1` | Singapore |
-| `southamerica-east1` | Sao Paulo, Brazil |
+| `asia-southeast1` | Singapura |
+| `southamerica-east1` | São Paulo, Brasil |
 
 ### Private Service Connect (PSC)
 
-For fully private connectivity (no public internet path to the Databricks control plane), you can configure Private Service Connect. This requires additional Terraform resources — see the [Databricks PSC documentation](https://docs.gcp.databricks.com/en/security/network/classic/private-service-connect.html).
+Para conectividade totalmente privada (sem caminho público para o plano de controle Databricks), você pode configurar o Private Service Connect. Isso requer recursos Terraform adicionais — consulte a [documentação de PSC do Databricks](https://docs.gcp.databricks.com/en/security/network/classic/private-service-connect.html).
 
 ---
 
-## Troubleshooting
+## Resolução de Problemas
 
-| Problem | Solution |
+| Problema | Solução |
 |---|---|
-| `Error: Permission denied` on GCP | Run `gcloud auth application-default login` and ensure your account has **Owner** or **Editor** role on the project |
-| `Error: Account API unauthorized` | Verify `DATABRICKS_HOST` and `DATABRICKS_TOKEN` are set correctly. Token must be **account-level**, not workspace-level |
-| `Error: CIDR range conflict` | Change the subnet CIDR in `terraform.tfvars` to avoid overlaps with existing subnets in your project |
-| `Error: API not enabled` | Run the `gcloud services enable` commands from Step 3 |
-| `terraform init` fails | Check your internet connection. If behind a proxy, set `HTTP_PROXY` and `HTTPS_PROXY` environment variables |
-| Workspace stuck provisioning | This can take up to 15 minutes. If it exceeds 30 minutes, check the Databricks account console for errors |
+| `Error: Permission denied` no GCP | Verifique se a Service Account possui as roles corretas no projeto (Owner ou a role customizada DatabricksAdmin) |
+| `Error: Account API unauthorized` | Verifique se a Service Account foi adicionada como admin de conta no console Databricks |
+| `Error: CIDR range conflict` | Altere o CIDR da subnet no `terraform.tfvars` para evitar sobreposição com subnets existentes |
+| `Error: API not enabled` | Execute os comandos `gcloud services enable` do Passo 3 |
+| `terraform init` falha | Verifique sua conexão com a internet. Se estiver atrás de proxy, defina `HTTP_PROXY` e `HTTPS_PROXY` |
+| Workspace travado no provisionamento | Pode levar até 15 minutos. Se ultrapassar 30 minutos, verifique o console de contas Databricks |
+| Token expirado | Execute novamente: `export GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)` |
 
 ---
 
-## Clean Up
+## Destruição (Teardown)
 
-To destroy all resources created by this Terraform:
+Para destruir todos os recursos criados:
 
 ```bash
 terraform destroy
 ```
 
-Type `yes` when prompted. This will remove the workspace, network config, VPC, and all associated resources.
+Digite `yes` quando solicitado.
 
-> **Warning:** This will permanently delete the Databricks workspace and all data within it.
+> **Atenção:** Isso vai excluir permanentemente o workspace Databricks e todos os dados dentro dele.
+
+### Se o `terraform destroy` falhar com erro "VPC already being used"
+
+Isso acontece porque o Databricks cria regras de firewall próprias na sua VPC durante o provisionamento. Essas regras precisam ser removidas antes de excluir a VPC.
+
+#### 1. Destruir na ordem de dependência
+
+```bash
+terraform destroy -target=databricks_mws_workspaces.this
+terraform destroy -target=google_compute_router_nat.databricks_nat -target=google_compute_router.databricks_router
+terraform destroy
+```
+
+#### 2. Se a VPC ainda estiver "in use", limpar recursos dependentes manualmente
+
+```bash
+# Listar e excluir regras de firewall criadas pelo Databricks
+gcloud compute firewall-rules list --filter="network~^databricks-vpc-" --project SEU_PROJECT_ID
+gcloud compute firewall-rules delete NOME_DA_REGRA --project SEU_PROJECT_ID
+
+# Listar e excluir routers/NAT residuais
+gcloud compute routers list --filter="name~^databricks-router-" --regions SUA_REGIAO --project SEU_PROJECT_ID
+gcloud compute routers nats delete NOME_NAT --router NOME_ROUTER --region SUA_REGIAO --project SEU_PROJECT_ID
+gcloud compute routers delete NOME_ROUTER --region SUA_REGIAO --project SEU_PROJECT_ID
+
+# Listar e excluir subnets residuais
+gcloud compute networks subnets list --filter="network~^databricks-vpc-" --regions SUA_REGIAO --project SEU_PROJECT_ID
+gcloud compute networks subnets delete NOME_SUBNET --region SUA_REGIAO --project SEU_PROJECT_ID
+```
+
+#### 3. Executar novamente
+
+```bash
+terraform destroy
+```
 
 ---
 
-## File Structure
+## Estrutura de Arquivos
 
 ```
 terraform-databricks-gcp-cmvpc/
 ├── images/
-│   ├── architecture.png    # Architecture diagram
-│   ├── network.png         # Network/CIDR diagram
-│   └── workflow.png        # Deployment workflow diagram
-├── network.tf              # VPC, subnet, firewall, Cloud Router, NAT
-├── workspace.tf            # Databricks network config + workspace
-├── providers.tf            # Provider configuration
-├── variables.tf            # Input variables
-├── outputs.tf              # Output values
-├── versions.tf             # Terraform and provider versions
-├── terraform.tfvars.example # Example variable values
-├── .gitignore              # Ignores .terraform, state files, secrets
-└── README.md               # This file
+│   ├── architecture.png       # Diagrama de arquitetura
+│   ├── network.png            # Diagrama de rede/CIDR
+│   └── workflow.png           # Diagrama do fluxo de deploy
+├── network.tf                 # VPC, subnet, Cloud Router, NAT
+├── workspace.tf               # Rede Databricks + workspace + usuário admin
+├── providers.tf               # Configuração dos providers
+├── variables.tf               # Variáveis de entrada
+├── outputs.tf                 # Valores de saída
+├── versions.tf                # Versões do Terraform e providers
+├── terraform.tfvars.example   # Valores de exemplo
+├── .gitignore                 # Ignora .terraform, state, secrets
+└── README.md                  # Este arquivo
 ```
 
 ---
 
-## License
+## Licença
 
 MIT

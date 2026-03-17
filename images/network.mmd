@@ -1,59 +1,40 @@
 flowchart TB
-    classDef primaryRangeStyle fill:#1a73e8,stroke:#0d47a1,color:#ffffff,font-weight:bold
-    classDef sizingStyle fill:#fce4ec,stroke:#c62828,color:#880e4f,font-weight:normal
-    classDef nodeStyle fill:#43a047,stroke:#2e7d32,color:#ffffff,font-weight:bold
-    classDef natStyle fill:#ff9800,stroke:#e65100,color:#ffffff,font-weight:bold
-    classDef fwStyle fill:#e53935,stroke:#b71c1c,color:#ffffff,font-weight:bold
-    classDef advantageStyle fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20,font-weight:bold
+    classDef rangeStyle fill:#1565c0,stroke:#0d47a1,color:#ffffff,font-weight:bold
+    classDef sizingStyle fill:#fff8e1,stroke:#f9a825,color:#4a3000
+    classDef nodeStyle fill:#2e7d32,stroke:#1b5e20,color:#ffffff,font-weight:bold
+    classDef natStyle fill:#e65100,stroke:#bf360c,color:#ffffff,font-weight:bold
+    classDef advantageStyle fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+    classDef suffixStyle fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c
     classDef internetStyle fill:#455a64,stroke:#263238,color:#ffffff,font-weight:bold
+    classDef headerStyle fill:#0d47a1,stroke:#01579b,color:#ffffff,font-weight:bold
 
-    INTERNET(["Internet / Google APIs"]):::internetStyle
+    SUFFIX["🔀 <b>Sufixo aleatório</b> (ex: a3f9b)<br/>aplicado a todos os recursos<br/>para evitar colisão de nomes no projeto GCP"]:::suffixStyle
 
-    subgraph VPC["  VPC: databricks-vpc  "]
+    subgraph VPC["VPC: databricks-vpc-a3f9b"]
         direction TB
 
-        FW["Firewall Rule
-─────────────────────────
-Allow internal traffic
-Source CIDR: 10.0.0.0/20
-Destination: 10.0.0.0/20
-Protocol: all"]:::fwStyle
-
-        subgraph SUBNET["  Subnet: databricks-vpc-subnet  "]
+        subgraph SUBNET["Subnet: databricks-subnet-a3f9b"]
             direction TB
 
-            PRIMARY["Primary Range: 10.0.0.0/20
-─────────────────────────────────────
-GCE Compute Nodes — Each node uses 2 IPs"]:::primaryRangeStyle
+            RANGE["<b>Range Primário: 10.0.0.0/20</b><br/>Nós de Compute GCE<br/>Cada nó utiliza 2 IPs do range"]:::rangeStyle
 
-            SIZING["Subnet Sizing Guide
-─────────────────────────────────────
-/25  →  ~60 nodes    (126 IPs)
-/24  →  ~120 nodes   (254 IPs)
-/22  →  ~500 nodes   (1,022 IPs)
-/20  →  ~2,000 nodes (4,094 IPs)"]:::sizingStyle
+            SIZING["<b>Guia de Dimensionamento</b><br/>/25  →  ~60 nós &nbsp;&nbsp;&nbsp;(126 IPs)<br/>/24  →  ~120 nós &nbsp;&nbsp;(254 IPs)<br/>/22  →  ~500 nós &nbsp;&nbsp;(1.022 IPs)<br/>/20  →  ~2.000 nós (4.094 IPs)"]:::sizingStyle
 
-            NODE1["GCE Node 1
-10.0.0.2 — 10.0.0.3"]:::nodeStyle
-            NODE2["GCE Node 2
-10.0.0.4 — 10.0.0.5"]:::nodeStyle
-            NODE3["GCE Node ...N
-10.0.x.x — 10.0.x.x"]:::nodeStyle
+            NODE1["<b>Nó GCE 1</b><br/>10.0.0.2 / 10.0.0.3"]:::nodeStyle
+            NODE2["<b>Nó GCE 2</b><br/>10.0.0.4 / 10.0.0.5"]:::nodeStyle
+            NODE3["<b>Nó GCE ...N</b><br/>10.0.x.x / 10.0.x.x"]:::nodeStyle
+
+            ADVANTAGE["✅ <b>Sem ranges secundários necessários</b><br/>Apenas UM range primário de subnet é usado.<br/>Topologia de rede simples e plana.<br/>Vantagem do GCE sobre o antigo modelo GKE."]:::advantageStyle
         end
 
-        NAT["Cloud NAT
-─────────────────────────
-Outbound-only egress
-Nodes have NO public IPs
-All outbound via NAT GW"]:::natStyle
-
-        ADVANTAGE["GCE Advantage — No Secondary IP Ranges Required
-Only ONE primary subnet range is needed.
-Simple flat network topology — no pod or service CIDRs."]:::advantageStyle
+        NAT["<b>☁ Cloud NAT</b><br/>Acesso de saída<br/>Nós sem IP público<br/>Saída via Gateway NAT"]:::natStyle
     end
 
-    PRIMARY --- SIZING
-    PRIMARY --> NODE1 & NODE2 & NODE3
-    FW -. "Protects node-to-node communication" .-> SUBNET
-    SUBNET --> NAT
-    NAT --> INTERNET
+    INTERNET(["🌐 Internet / Google APIs"]):::internetStyle
+
+    SUFFIX -.->|"Convenção de nomenclatura"| VPC
+    RANGE --> SIZING
+    RANGE --> NODE1 & NODE2 & NODE3
+    RANGE -.- ADVANTAGE
+    SUBNET -->|"Tráfego de saída"| NAT
+    NAT -->|"Acesso externo seguro"| INTERNET

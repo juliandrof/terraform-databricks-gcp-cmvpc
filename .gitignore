@@ -1,16 +1,26 @@
 # Terraform
-.terraform/
+**/.terraform/*
+.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfplan
-*.tfvars
-!terraform.tfvars.example
-.terraform.lock.hcl
+*.plan
 crash.log
+crash.*.log
 override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+.terraformrc
+terraform.rc
+
+# Variáveis sensíveis — nunca commitar
+*.tfvars
+!terraform.tfvars.example
+
+# Chaves de service account
+*.json
+!package.json
 
 # OS
 .DS_Store

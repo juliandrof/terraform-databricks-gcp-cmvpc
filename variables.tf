@@ -1,39 +1,37 @@
-variable "databricks_account_id" {
-  description = "Databricks account ID (found in the Databricks account console)"
+variable "google_service_account_email" {
+  description = "E-mail da Google Service Account usada para autenticação nos providers"
   type        = string
 }
 
 variable "gcp_project_id" {
-  description = "GCP project ID where resources will be created"
+  description = "ID do projeto GCP onde os recursos serão criados"
   type        = string
 }
 
 variable "gcp_region" {
-  description = "GCP region for the Databricks workspace"
+  description = "Região GCP para o workspace Databricks"
   type        = string
   default     = "us-central1"
 }
 
+variable "databricks_account_id" {
+  description = "ID da conta Databricks (encontrado no console de contas)"
+  type        = string
+}
+
 variable "workspace_name" {
-  description = "Name of the Databricks workspace"
+  description = "Nome do workspace Databricks"
   type        = string
   default     = "databricks-workspace"
 }
 
-variable "vpc_name" {
-  description = "Name of the customer-managed VPC"
+variable "databricks_admin_user" {
+  description = "E-mail do usuário admin a ser adicionado ao workspace (deve existir na conta Databricks)"
   type        = string
-  default     = "databricks-vpc"
 }
 
 variable "subnet_ip_cidr_range" {
-  description = "Primary IP CIDR range for the compute subnet (each GCE node uses 2 IPs)"
+  description = "Range CIDR primário da subnet de compute (cada nó GCE usa 2 IPs)"
   type        = string
   default     = "10.0.0.0/20"
-}
-
-variable "private_google_access" {
-  description = "Enable Private Google Access on the subnet"
-  type        = bool
-  default     = true
 }
