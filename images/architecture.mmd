@@ -1,0 +1,68 @@
+flowchart TB
+    ACC["<b>Databricks Account Console</b><br/>accounts.gcp.databricks.com"]
+
+    subgraph GCP ["  GCP Project  "]
+        direction TB
+
+        DCP["<b>Databricks Control Plane</b><br/>Managed by Databricks"]
+
+        subgraph CMVPC ["  Customer-Managed VPC  "]
+            direction TB
+
+            subgraph SUBNET ["  Subnet — 10.0.0.0/20  "]
+                direction LR
+                GKE["<b>GKE Nodes</b><br/>(Private)"]
+                FW["<b>Firewall Rules</b><br/>Internal Traffic"]
+            end
+
+            subgraph RANGES ["  Secondary IP Ranges  "]
+                direction LR
+                PODS["<b>Pods</b><br/>10.1.0.0/16"]
+                SVCS["<b>Services</b><br/>10.2.0.0/20"]
+            end
+
+            subgraph EGRESS ["  Outbound Internet  "]
+                direction LR
+                CR["<b>Cloud Router</b>"]
+                NAT["<b>Cloud NAT</b>"]
+            end
+        end
+
+        NC["<b>Network Config</b><br/>MWS API"]
+        WS["<b>Databricks Workspace</b>"]
+    end
+
+    EXT(("<b>Internet</b>"))
+
+    ACC -->|"1. MWS API call"| NC
+    NC -->|"2. Register VPC & Subnets"| CMVPC
+    NC -->|"3. Create Workspace"| WS
+    WS -->|"4. Provision GKE in Customer VPC"| GKE
+    DCP <-->|"5. Control Plane <-> Data Plane"| GKE
+
+    GKE --- FW
+    GKE -.->|"Pod IPs"| PODS
+    GKE -.->|"Service IPs"| SVCS
+    GKE -->|"Outbound traffic"| CR
+    CR --> NAT
+    NAT -->|"Internet"| EXT
+
+    classDef externalNode fill:#4285F4,stroke:#1A73E8,color:#ffffff
+    classDef databricksNode fill:#FF6F00,stroke:#E65100,color:#ffffff
+    classDef gkeNode fill:#00897B,stroke:#00695C,color:#ffffff
+    classDef networkNode fill:#7B1FA2,stroke:#6A1B9A,color:#ffffff
+    classDef rangeNode fill:#F57F17,stroke:#E65100,color:#ffffff
+    classDef internetNode fill:#607D8B,stroke:#455A64,color:#ffffff
+
+    class ACC externalNode
+    class DCP,NC,WS databricksNode
+    class GKE gkeNode
+    class FW,CR,NAT networkNode
+    class PODS,SVCS rangeNode
+    class EXT internetNode
+
+    style GCP fill:#E8F5E9,stroke:#2E7D32,stroke-width:3px,color:#1B5E20,font-size:14px
+    style CMVPC fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#0D47A1,font-size:13px
+    style SUBNET fill:#FFF8E1,stroke:#F9A825,stroke-width:2px,color:#4E342E
+    style RANGES fill:#F3E5F5,stroke:#AB47BC,stroke-width:2px,color:#4A148C
+    style EGRESS fill:#E0F7FA,stroke:#0097A7,stroke-width:2px,color:#006064

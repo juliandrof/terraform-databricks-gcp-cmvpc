@@ -1,0 +1,44 @@
+flowchart TB
+    classDef vpcStyle fill:#1a73e8,stroke:#0d47a1,color:#ffffff,font-weight:bold
+    classDef subnetStyle fill:#4285f4,stroke:#1a73e8,color:#ffffff,font-weight:bold
+    classDef primaryRange fill:#0f9d58,stroke:#0b7a45,color:#ffffff,font-weight:bold
+    classDef podsRange fill:#e8710a,stroke:#b85c08,color:#ffffff,font-weight:bold
+    classDef servicesRange fill:#a142f4,stroke:#7c2fc2,color:#ffffff,font-weight:bold
+    classDef masterRange fill:#c5221f,stroke:#922019,color:#ffffff,font-weight:bold
+    classDef natStyle fill:#fbbc04,stroke:#e8a000,color:#202124,font-weight:bold
+    classDef firewallStyle fill:#34a853,stroke:#1e7e34,color:#ffffff,font-weight:bold
+    classDef internetStyle fill:#5f6368,stroke:#3c4043,color:#ffffff,font-weight:bold
+    classDef gcpStyle fill:#e8f0fe,stroke:#4285f4,color:#202124
+
+    INTERNET["Internet\n(Outbound Traffic)"]:::internetStyle
+
+    subgraph GCP["Google Cloud Platform"]
+        direction TB
+
+        NAT["Cloud NAT\nOutbound Internet Gateway\nManaged SNAT"]:::natStyle
+
+        subgraph VPC["VPC: databricks-vpc"]
+            direction TB
+
+            FW["Firewall Rule\nAllow Internal Traffic\nSources: 10.0.0.0/20, 10.1.0.0/16,\n10.2.0.0/20, 10.3.0.0/28"]:::firewallStyle
+
+            subgraph SUBNET["Subnet: databricks-vpc-subnet  (Region: us-east1)"]
+                direction TB
+
+                PRIMARY["PRIMARY RANGE\ndatabricks-vpc-subnet\n10.0.0.0/20\nGKE Nodes\n4,094 available IPs\n/20 prefix"]:::primaryRange
+
+                PODS["SECONDARY RANGE — pods\n10.1.0.0/16\nGKE Pods\n65,534 available IPs\n/16 prefix"]:::podsRange
+
+                SERVICES["SECONDARY RANGE — services\n10.2.0.0/20\nGKE Services\n4,094 available IPs\n/20 prefix"]:::servicesRange
+
+                MASTER["GKE MASTER RANGE\n10.3.0.0/28\nControl Plane (Private)\n14 available IPs\n/28 prefix"]:::masterRange
+            end
+        end
+    end
+
+    PRIMARY -- "Pods scheduled\non nodes" --> PODS
+    PRIMARY -- "Services exposed\nto nodes" --> SERVICES
+    MASTER -- "API server controls\nnode workloads" --> PRIMARY
+    FW -. "Allows intra-VPC\ncommunication" .-> SUBNET
+    PRIMARY -- "Outbound via\nCloud NAT" --> NAT
+    NAT --> INTERNET
